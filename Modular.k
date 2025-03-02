@@ -33,16 +33,39 @@ struct OSC : Generator {
 
 // Filter Section
 struct FLT : Modifier {
-	LPF filter;
-	// TODO: add filter options
+	LPF lpf;
+	HPF hpf;
+	BPF bpf;
 
-	void set(param f, param Q){
-		// TODO: configure the filter(s)
+	int filterType = 0;
+	param f = 0;
+	param Q = 1;
+
+	void set(param freq, param res){
+		f = freq;
+		Q = res;
+	}
+	
+	void setFilterType(int fType){
+		filterType = fType;
+		lpf.reset();
+		hpf.reset();
+		bpf.reset();
 	}
 	
 	void process() {
 		// TODO: apply the filter
-		in >> out;
+		switch(filterType){
+			case 0: // lpf
+				in >> lpf(f, Q) >> out;
+				break;
+			case 1: // hpf
+				in >> hpf(f, Q) >> out;
+				break;
+			case 2: // bpf
+				in >> bpf(f, Q) >> out;
+				break;
+		}
 	}
 };
 
@@ -78,7 +101,8 @@ struct Modular : Synth {
 		event on(Pitch pitch, Amplitude velocity) {
 			osc.set(pitch -> Frequency);
 			amp.env(controls[4], controls[5], controls[6], controls[7]);
-			
+
+			flt.setFilterType(controls[12]);
 			// TODO: configure sections
 		}
 
