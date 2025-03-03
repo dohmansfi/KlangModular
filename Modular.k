@@ -25,13 +25,12 @@ struct OSC : Generator {
 	// TODO: add mixer controls
 	param gain[3] = {0};
 	
-	// TODO: add a detune function
-	
 	void set(param f, param gain1, param gain2, param gain3, param detune){
 		gain[0] = gain1;
 		gain[1] = gain2;
 		gain[2] = gain3;
 		osc1(f, 0);
+		// TODO: add a detune function
 		osc2(f - detune, 0);
 		osc3(f + detune, 0);
 	}
@@ -98,7 +97,13 @@ struct MOD : Generator {
 	}
 };
 
-// 	TODO: add LFO section
+struct LFO : Generator {
+	Sine lfo;
+	
+	void set(param f) {
+		lfo(f);
+	}
+};
 
 struct Modular : Synth {
 
@@ -107,6 +112,7 @@ struct Modular : Synth {
 		FLT flt;
 		AMP amp;
 		MOD mod;
+		Sine lfo;
 
 		event on(Pitch pitch, Amplitude velocity) {
 			const param f = pitch -> Frequency;
@@ -115,7 +121,7 @@ struct Modular : Synth {
 			amp.env(controls[4], controls[5], controls[6], controls[7]);
 			
 			// TODO: configure sections
-			flt.setFilterType(controls[12]); 
+			flt.setFilterType(controls[12]);
 			
 		}
 
@@ -128,8 +134,18 @@ struct Modular : Synth {
 
 			param f = controls[13];
 			param Q = controls[14];
-
-			osc >> flt(f, Q) >> amp >> out;
+			
+			param lfoDepth   = controls[16];
+			param lfoF       = lfo(controls[18]) * 0.5 + 0.5;  
+			param modulatedF = f * (1.0 + lfoF * lfoDepth);
+			
+			// limit to the cutoff's range
+			if (modulatedF < 100) 
+				modulatedF = 100;
+			if (modulatedF > 10000)
+				modulatedF = 10000;
+				
+			osc >> flt(modulatedF, Q) >> amp >> out;
 			
 			if (amp.env.finished())
 				stop();
