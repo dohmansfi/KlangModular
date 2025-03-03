@@ -107,6 +107,7 @@ struct Modular : Synth {
 		FLT flt;
 		AMP amp;
 		MOD mod;
+		Sine lfo;
 
 		event on(Pitch pitch, Amplitude velocity) {
 			const param f = pitch -> Frequency;
@@ -128,8 +129,18 @@ struct Modular : Synth {
 
 			param f = controls[13];
 			param Q = controls[14];
+			
+			param lfoDepth   = controls[16];
+			param lfoF       = lfo(controls[18]) * 0.5 + 0.5;  
+			param modulatedF = f * (1.0 + lfoF * lfoDepth);
 
-			osc >> flt(f, Q) >> amp >> out;
+			// limit to the cutoff's range
+			if (modulatedF < 100) 
+				modulatedF = 100;
+			if (modulatedF > 10000)
+				modulatedF = 10000;
+
+			osc >> flt(modulatedF, Q) >> amp >> out;
 			
 			if (amp.env.finished())
 				stop();
