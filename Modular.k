@@ -17,17 +17,27 @@ signal bipolar(signal x){ return pow(10, x); }
 
 // Oscillator Section
 struct OSC : Generator {
-	Saw osc;
+	Saw osc1;
 	// TODO: add more oscillators
+	Saw osc2;
+	Square osc3;
+	
 	// TODO: add mixer controls
+	param gain[3] = {0};
+	
 	// TODO: add a detune function
-
-	void set(param f){
-		osc(f, 0);
+	
+	void set(param f, param gain1, param gain2, param gain3, param detune){
+		gain[0] = gain1;
+		gain[1] = gain2;
+		gain[2] = gain3;
+		osc1(f, 0);
+		osc2(f - detune, 0);
+		osc3(f + detune, 0);
 	}
 
 	void process() {
-		osc >> out;
+		(osc1 * gain[0] + osc2 * gain[1] + osc3 * gain[2]) * 0.333 >> out;
 	}
 };
 
@@ -99,11 +109,14 @@ struct Modular : Synth {
 		MOD mod;
 
 		event on(Pitch pitch, Amplitude velocity) {
-			osc.set(pitch -> Frequency);
+			const param f = pitch -> Frequency;
+			const param detune = f * 0.01f * controls[3];
+			osc.set(pitch -> Frequency, controls[0], controls[1], controls[2], detune);
 			amp.env(controls[4], controls[5], controls[6], controls[7]);
-
-			flt.setFilterType(controls[12]);
+			
 			// TODO: configure sections
+			flt.setFilterType(controls[12]); 
+			
 		}
 
 		event off(Amplitude velocity) {
