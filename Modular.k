@@ -98,7 +98,27 @@ struct MOD : Generator {
 	}
 };
 
-// 	TODO: add LFO section
+// TODO: add LFO section
+struct LFO : Modifier {
+	Sine sin;
+	Triangle tri;
+	Saw saw;
+	
+	void process(param rate, param shape) {
+	
+		// compute smooth blending weights using sigmoid curves
+        signal blend1 = 1.0 / (1.0 + exp(-10.0 * (shape - 0.5)));  // sine to triangle
+        signal blend2 = 1.0 / (1.0 + exp(-10.0 * (shape - 1.5)));  // triangle to saw
+		
+		// mod signals
+        signal sinMod = sin(rate) * 0.5 + 0.5;
+        signal triMod = tri(rate) * 0.5 + 0.5;
+        signal sawMod = saw(rate) * 0.5 + 0.5;
+        signal mod    = (1.0 - blend1) * sinMod + (blend1 - blend2) * triMod + blend2 * sawMod;
+    
+		mod >> out;
+	}
+};
 
 struct Modular : Synth {
 
@@ -107,7 +127,7 @@ struct Modular : Synth {
 		FLT flt;
 		AMP amp;
 		MOD mod;
-		Sine lfo;
+		LFO lfo;
 
 		event on(Pitch pitch, Amplitude velocity) {
 			const param f = pitch -> Frequency;
@@ -116,8 +136,7 @@ struct Modular : Synth {
 			amp.env(controls[4], controls[5], controls[6], controls[7]);
 			
 			// TODO: configure sections
-			flt.setFilterType(controls[12]); 
-			
+			flt.setFilterType(controls[12]);
 		}
 
 		event off(Amplitude velocity) {
@@ -130,12 +149,14 @@ struct Modular : Synth {
 			param f = controls[13];
 			param Q = controls[14];
 			
-			param lfoDepth   = controls[16];
-			param lfoF       = lfo(controls[18]) * 0.5 + 0.5;  
-			param modulatedF = f * (1.0 + lfoF * lfoDepth);
+			// LFO
+			lfo.process(controls[18] * 8, controls[19] * 2);
+			param lfoDepth = controls[16]; 
+			param blend = 1.0 / (1.0 + exp(-10.0 * (lfoDepth - 0.8)));        // smooth transition using a logistic sigmoid function
+			lfoDepth = (1.0 - blend) * lfoDepth + blend * (lfoDepth * 10.0);  // Interpolate between linear and exponential
+			param modulatedF = f * (1.0 + lfo.out * lfoDepth);                // modulated frequency
 
-			// limit to the cutoff's range
-			if (modulatedF < 100) 
+			if (modulatedF < 100)										      // limit to the cutoff's range
 				modulatedF = 100;
 			if (modulatedF > 10000)
 				modulatedF = 10000;
@@ -172,8 +193,8 @@ struct Modular : Synth {
 						Dial("MOD", -1, 1, 0, { 220, 173, 25, 30 } ) },
 			
 			{ "LFO", { 269, 131 },
-						Dial("Rate", .1, 10, 1, { 7, 0, 40, 60 } ),
-						Dial("Depth", 0, 1, 0, { 58, 0, 40, 60 } ),
+						Dial("Rate", .1, 1, 1, { 7, 0, 40, 60 } ),
+						Dial("Shape", 0, 2, 0, { 58, 0, 40, 60 } ),
 			},
 		};
 		notes.add<ModularNote>(32);
